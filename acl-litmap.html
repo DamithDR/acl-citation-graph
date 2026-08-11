@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anthology Atlas — ACL citation mapper</title>
+<style>
+  :root{
+    --ink:#12100c; --ink-2:#57534a; --ink-3:#8b867a;
+    --paper:#f6f3ea; --card:#fffdf7; --line:#ddd6c4; --line-2:#cbc2a9;
+    --seed:#b5491f;  --seed-soft:#f2d9cc;
+    --node:#3a6b57;  --node-soft:#d9e7df;
+    --edge:#c9bfa4;  --edge-hot:#b5491f;
+    --focus:#2f6f8f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  .masthead{
+    display:flex; align-items:baseline; gap:.9rem; flex-wrap:wrap;
+    padding:14px 20px 12px; border-bottom:1.5px solid var(--ink);
+    background:var(--paper);
+  }
+  .masthead h1{
+    font-size:23px; font-weight:600; margin:0; letter-spacing:-.01em;
+    font-variant:small-caps; }
+  .masthead .sub{ font-size:12.5px; color:var(--ink-2);
+    font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.02em; }
+  .masthead .count{ margin-left:auto; font-size:12px; color:var(--ink-3);
+    font-family:"IBM Plex Mono",ui-monospace,monospace; }
+
+  .stage{ display:flex; flex:1; min-height:0; }
+
+  aside{
+    width:322px; flex-shrink:0; border-right:1px solid var(--line);
+    display:flex; flex-direction:column; background:var(--card); min-height:0;
+  }
+  .panel{ padding:14px 16px; border-bottom:1px solid var(--line); }
+  .panel .lbl{ font-family:"IBM Plex Mono",monospace; font-size:10.5px;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3);
+    margin:0 0 8px; }
+  .search-wrap{ position:relative; }
+  input[type=text]{
+    width:100%; padding:9px 11px; font:inherit; font-size:14px;
+    border:1px solid var(--line-2); border-radius:2px; background:#fff;
+    color:var(--ink); }
+  input[type=text]:focus{ outline:2px solid var(--focus); outline-offset:-1px; border-color:var(--focus); }
+  .results{ list-style:none; margin:6px 0 0; padding:0; max-height:196px;
+    overflow-y:auto; }
+  .results li{ padding:7px 9px; border-radius:2px; cursor:pointer; font-size:13px;
+    line-height:1.32; border:1px solid transparent; }
+  .results li:hover{ background:var(--seed-soft); }
+  .results li .yr{ font-family:"IBM Plex Mono",monospace; font-size:11px;
+    color:var(--ink-3); }
+  .results li em{ font-style:normal; color:var(--ink-2); }
+
+  .seedlist{ list-style:none; margin:0; padding:0; }
+  .seedlist li{ display:flex; gap:8px; align-items:flex-start; font-size:13px;
+    padding:7px 0; border-bottom:1px dotted var(--line); line-height:1.3; }
+  .seedlist li:last-child{ border-bottom:0; }
+  .dot{ width:10px; height:10px; border-radius:50%; background:var(--seed);
+    margin-top:3px; flex-shrink:0; }
+  .seedlist .x{ margin-left:auto; cursor:pointer; color:var(--ink-3);
+    font-family:"IBM Plex Mono",monospace; padding:0 3px; }
+  .seedlist .x:hover{ color:var(--seed); }
+  .empty{ font-size:12.5px; color:var(--ink-3); font-style:italic; }
+
+  .ctl{ display:flex; align-items:center; gap:9px; margin:9px 0; font-size:12.5px;
+    color:var(--ink-2); }
+  .ctl label{ min-width:78px; font-family:"IBM Plex Mono",monospace; font-size:11px;
+    letter-spacing:.03em; }
+  .ctl select, .ctl input[type=range]{ flex:1; }
+  .ctl select{ font:inherit; font-size:12.5px; padding:4px 6px; border:1px solid var(--line-2);
+    border-radius:2px; background:#fff; }
+  .ctl .val{ font-family:"IBM Plex Mono",monospace; font-size:11px; min-width:26px;
+    text-align:right; color:var(--ink); }
+
+  button.act{ width:100%; padding:9px; font:inherit; font-size:13px; font-weight:600;
+    background:var(--ink); color:var(--paper); border:0; border-radius:2px; cursor:pointer;
+    letter-spacing:.02em; }
+  button.act:hover{ background:#000; }
+  button.ghost{ background:transparent; color:var(--ink-2); border:1px solid var(--line-2);
+    margin-top:8px; }
+  button.ghost:hover{ background:var(--paper); }
+
+  main{ flex:1; position:relative; min-width:0; background:
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,.05) 1px, transparent 0) 0 0/22px 22px; }
+  svg{ width:100%; height:100%; display:block; cursor:grab; }
+  svg.drag{ cursor:grabbing; }
+  .axis-lbl{ font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--ink-3);
+    letter-spacing:.08em; text-transform:uppercase; }
+  .tick{ font-family:"IBM Plex Mono",monospace; font-size:10px; fill:var(--ink-3); }
+  .gridline{ stroke:var(--line); stroke-width:1; }
+  .node circle{ cursor:pointer; }
+  .node text{ font-size:11px; fill:var(--ink); pointer-events:none; }
+  .legend{ position:absolute; left:16px; bottom:14px; background:rgba(255,253,247,.94);
+    border:1px solid var(--line); border-radius:3px; padding:9px 12px; font-size:11.5px;
+    color:var(--ink-2); line-height:1.7; }
+  .legend b{ display:inline-block; width:11px; height:11px; border-radius:50%;
+    vertical-align:-1px; margin-right:6px; }
+
+  .detail{ position:absolute; right:16px; top:16px; width:270px; background:var(--card);
+    border:1px solid var(--line-2); border-radius:3px; padding:14px 15px; font-size:13px;
+    box-shadow:0 6px 22px rgba(60,45,20,.14); display:none; }
+  .detail.show{ display:block; }
+  .detail h3{ margin:0 0 5px; font-size:15px; line-height:1.28; font-weight:600; }
+  .detail .meta{ font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3);
+    margin-bottom:9px; }
+  .detail .auth{ color:var(--ink-2); font-size:12.5px; margin-bottom:11px; line-height:1.4; }
+  .detail a{ color:var(--focus); text-decoration:none; font-size:12px;
+    font-family:"IBM Plex Mono",monospace; }
+  .detail a:hover{ text-decoration:underline; }
+  .detail .addbtn{ width:100%; margin-top:11px; padding:7px; font:inherit; font-size:12px;
+    background:var(--seed); color:#fff; border:0; border-radius:2px; cursor:pointer; }
+  .detail .close{ position:absolute; right:9px; top:7px; cursor:pointer; color:var(--ink-3);
+    font-family:monospace; font-size:15px; }
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <h1>Anthology&nbsp;Atlas</h1>
+    <span class="sub">citation cartography · ACL Anthology corpus</span>
+    <span class="count" id="corpusCount"></span>
+  </header>
+
+  <div class="stage">
+    <aside>
+      <div class="panel">
+        <p class="lbl">Find a seed paper</p>
+        <div class="search-wrap">
+          <input type="text" id="search" placeholder="title, author, or ACL id…" autocomplete="off" />
+          <ul class="results" id="results"></ul>
+        </div>
+      </div>
+
+      <div class="panel" style="flex:1; overflow-y:auto; min-height:80px;">
+        <p class="lbl">Seed set <span id="seedN" style="color:var(--seed)"></span></p>
+        <ul class="seedlist" id="seeds"></ul>
+        <p class="empty" id="seedEmpty">No seeds yet. Search above and pick a paper to anchor the map.</p>
+      </div>
+
+      <div class="panel">
+        <p class="lbl">Expansion</p>
+        <div class="ctl">
+          <label>show top</label>
+          <input type="range" id="topN" min="6" max="40" value="18" step="1" />
+          <span class="val" id="topNv">18</span>
+        </div>
+        <div class="ctl">
+          <label>rank by</label>
+          <select id="rank">
+            <option value="blend">blend (all signals)</option>
+            <option value="cocite">co-citation</option>
+            <option value="couple">bibliographic coupling</option>
+            <option value="direct">direct citation</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label>y-axis</label>
+          <select id="yaxis">
+            <option value="cited">in-corpus citations</option>
+            <option value="relevance">relevance to seeds</option>
+          </select>
+        </div>
+        <button class="act" id="expand">Explore connections</button>
+        <button class="act ghost" id="reset">Clear map</button>
+      </div>
+    </aside>
+
+    <main>
+      <svg id="canvas"></svg>
+      <div class="legend">
+        <div><b style="background:var(--seed)"></b>Seed paper</div>
+        <div><b style="background:var(--node)"></b>Suggested — connected via citations</div>
+        <div style="margin-top:3px; color:var(--ink-3); font-size:10.5px;">x · publication year → · y · citations ↑</div>
+      </div>
+      <div class="detail" id="detail"></div>
+    </main>
+  </div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   DATA. This baked-in sample lets the app run standalone. To use the real
+   corpus, replace SAMPLE with the graph.json produced by build_graph.py:
+     fetch('graph.json').then(r=>r.json()).then(g => boot(g))
+   The shape is identical: {nodes:[{id,title,year,authors,venue,url,cited_by}],
+   edges:[[citing,cited]], cocitation:[[a,b,w]], coupling:[[a,b,w]]}.
+--------------------------------------------------------------------------- */
+const SAMPLE = {
+  nodes: [
+    {id:"N03-1017", title:"Statistical Phrase-Based Translation", year:2003, authors:["Koehn","Och","Marcu"], venue:"NAACL", cited_by:41},
+    {id:"P02-1040", title:"BLEU: a Method for Automatic Evaluation of Machine Translation", year:2002, authors:["Papineni","Roukos","Ward","Zhu"], venue:"ACL", cited_by:58},
+    {id:"P03-1021", title:"Minimum Error Rate Training in Statistical Machine Translation", year:2003, authors:["Och"], venue:"ACL", cited_by:37},
+    {id:"P05-1033", title:"A Hierarchical Phrase-Based Model for SMT", year:2005, authors:["Chiang"], venue:"ACL", cited_by:34},
+    {id:"D13-1170", title:"Recursive Deep Models for Semantic Compositionality", year:2013, authors:["Socher","Perelygin","Wu","et al."], venue:"EMNLP", cited_by:33},
+    {id:"D14-1162", title:"GloVe: Global Vectors for Word Representation", year:2014, authors:["Pennington","Socher","Manning"], venue:"EMNLP", cited_by:52},
+    {id:"D14-1181", title:"Convolutional Neural Networks for Sentence Classification", year:2014, authors:["Kim"], venue:"EMNLP", cited_by:44},
+    {id:"D14-1179", title:"Sequence to Sequence Learning with Neural Networks", year:2014, authors:["Sutskever","Vinyals","Le"], venue:"EMNLP", cited_by:49},
+    {id:"P14-1062", title:"A Convolutional Neural Network for Modelling Sentences", year:2014, authors:["Kalchbrenner","Grefenstette","Blunsom"], venue:"ACL", cited_by:27},
+    {id:"D15-1166", title:"Effective Approaches to Attention-based NMT", year:2015, authors:["Luong","Pham","Manning"], venue:"EMNLP", cited_by:46},
+    {id:"P15-1150", title:"Improved Semantic Representations From Tree-LSTM", year:2015, authors:["Tai","Socher","Manning"], venue:"ACL", cited_by:31},
+    {id:"N16-1030", title:"Neural Architectures for Named Entity Recognition", year:2016, authors:["Lample","Ballesteros","et al."], venue:"NAACL", cited_by:35},
+    {id:"P16-1162", title:"Neural Machine Translation of Rare Words with Subword Units", year:2016, authors:["Sennrich","Haddow","Birch"], venue:"ACL", cited_by:47},
+    {id:"P16-1144", title:"A Diversity-Promoting Objective for Dialogue", year:2016, authors:["Li","Galley","Brockett","et al."], venue:"ACL", cited_by:24},
+    {id:"D16-1264", title:"SQuAD: 100,000+ Questions for Machine Comprehension", year:2016, authors:["Rajpurkar","Zhang","et al."], venue:"EMNLP", cited_by:43},
+    {id:"P17-1052", title:"Get To The Point: Summarization with Pointer-Generator", year:2017, authors:["See","Liu","Manning"], venue:"ACL", cited_by:38},
+    {id:"D17-1070", title:"Supervised Learning of Universal Sentence Representations", year:2017, authors:["Conneau","Kiela","et al."], venue:"EMNLP", cited_by:29},
+    {id:"N18-1202", title:"Deep Contextualized Word Representations (ELMo)", year:2018, authors:["Peters","Neumann","et al."], venue:"NAACL", cited_by:51},
+    {id:"P18-1031", title:"Universal Language Model Fine-tuning (ULMFiT)", year:2018, authors:["Howard","Ruder"], venue:"ACL", cited_by:36},
+    {id:"D18-1259", title:"GLUE: A Multi-Task Benchmark for NLU", year:2018, authors:["Wang","Singh","et al."], venue:"EMNLP", cited_by:45},
+    {id:"N19-1423", title:"BERT: Pre-training of Deep Bidirectional Transformers", year:2019, authors:["Devlin","Chang","Lee","Toutanova"], venue:"NAACL", cited_by:62},
+    {id:"P19-1285", title:"Transformer-XL: Attentive LMs Beyond a Fixed Context", year:2019, authors:["Dai","Yang","et al."], venue:"ACL", cited_by:30},
+    {id:"D19-1410", title:"Sentence-BERT: Sentence Embeddings using Siamese BERT", year:2019, authors:["Reimers","Gurevych"], venue:"EMNLP", cited_by:39},
+    {id:"P19-1355", title:"BERTScore-style Evaluating Generated Text", year:2019, authors:["Zhang","Kishore","et al."], venue:"ACL", cited_by:28},
+    {id:"2020.acl-main.703", title:"BART: Denoising Seq-to-Seq Pre-training", year:2020, authors:["Lewis","Liu","et al."], venue:"ACL", cited_by:41},
+    {id:"2020.acl-main.740", title:"Don't Stop Pretraining: Adapt LMs to Domains", year:2020, authors:["Gururangan","Marasovic","et al."], venue:"ACL", cited_by:26},
+    {id:"2020.emnlp-main.550", title:"Retrieval-Augmented Generation for NLP Tasks", year:2020, authors:["Lewis","Perez","et al."], venue:"EMNLP", cited_by:33},
+    {id:"2021.naacl-main.41", title:"Prefix-Tuning: Optimizing Continuous Prompts", year:2021, authors:["Li","Liang"], venue:"NAACL", cited_by:27},
+    {id:"2021.acl-long.353", title:"Making Pre-trained LMs Better Few-shot Learners", year:2021, authors:["Gao","Fisch","Chen"], venue:"ACL", cited_by:30},
+    {id:"2022.acl-long.220", title:"Learned Incremental Representations for Parsing", year:2022, authors:["Kitaev","Lu","Klein"], venue:"ACL", cited_by:14},
+    {id:"2022.emnlp-main.759", title:"Chain-of-Thought Prompting Elicits Reasoning", year:2022, authors:["Wei","Wang","et al."], venue:"EMNLP", cited_by:35},
+    {id:"2023.acl-long.870", title:"Scaling Instruction-Finetuned Language Models", year:2023, authors:["Chung","Hou","et al."], venue:"ACL", cited_by:22},
+  ],
+  edges: [
+    ["P03-1021","P02-1040"],["N03-1017","P02-1040"],["P05-1033","N03-1017"],["P05-1033","P03-1021"],
+    ["D15-1166","D14-1179"],["D14-1179","N03-1017"],["P16-1162","D14-1179"],["P16-1162","D15-1166"],
+    ["P15-1150","D13-1170"],["D14-1181","D13-1170"],["P14-1062","D13-1170"],["P15-1150","D14-1162"],
+    ["D14-1181","D14-1162"],["N16-1030","D14-1162"],["P17-1052","D15-1166"],["P17-1052","D14-1179"],
+    ["D16-1264","D14-1162"],["D17-1070","D14-1162"],["D17-1070","D13-1170"],["N18-1202","D14-1162"],
+    ["N18-1202","N16-1030"],["P18-1031","N18-1202"],["D18-1259","D16-1264"],["N19-1423","N18-1202"],
+    ["N19-1423","P18-1031"],["N19-1423","D18-1259"],["N19-1423","D16-1264"],["P19-1285","N19-1423"],
+    ["D19-1410","N19-1423"],["P19-1355","N19-1423"],["2020.acl-main.703","N19-1423"],
+    ["2020.acl-main.703","D14-1179"],["2020.acl-main.740","N19-1423"],["2020.emnlp-main.550","N19-1423"],
+    ["2020.emnlp-main.550","D16-1264"],["2021.naacl-main.41","2020.acl-main.703"],
+    ["2021.acl-long.353","N19-1423"],["2021.acl-long.353","D18-1259"],["2022.acl-long.220","N19-1423"],
+    ["2022.emnlp-main.759","2021.acl-long.353"],["2022.emnlp-main.759","N19-1423"],
+    ["2023.acl-long.870","2022.emnlp-main.759"],["2023.acl-long.870","2020.acl-main.703"],
+    ["D19-1410","D17-1070"],["P16-1144","D14-1179"],["P14-1062","D14-1181"],
+  ],
+  cocitation: [], coupling: []
+};
+
+/* Derive co-citation & coupling from edges if not supplied ------------------ */
+function derive(g){
+  if(g.cocitation && g.cocitation.length) return g;
+  const out={}, co={}, cp={};
+  g.edges.forEach(([s,t])=>{ (out[s]=out[s]||new Set()).add(t); });
+  const key=(a,b)=> a<b? a+"|"+b : b+"|"+a;
+  for(const s in out){ const refs=[...out[s]];
+    for(let i=0;i<refs.length;i++) for(let j=i+1;j<refs.length;j++){
+      const k=key(refs[i],refs[j]); co[k]=(co[k]||0)+1; } }
+  const srcs=Object.keys(out);
+  for(let i=0;i<srcs.length;i++) for(let j=i+1;j<srcs.length;j++){
+    let sh=0; out[srcs[i]].forEach(x=>{ if(out[srcs[j]].has(x)) sh++; });
+    if(sh) cp[key(srcs[i],srcs[j])]=sh; }
+  g.cocitation=Object.entries(co).map(([k,w])=>[...k.split("|"),w]);
+  g.coupling=Object.entries(cp).map(([k,w])=>[...k.split("|"),w]);
+  return g;
+}
+
+/* ---------------------------------------------------------------------------
+   APP STATE + ENGINE
+--------------------------------------------------------------------------- */
+let G, NODE, ADJ_CO, ADJ_CP, DIRECT;
+const seeds = new Set();
+let placed = [];            // {node, x, y, kind}
+let view = {x:0,y:0,k:1};   // pan/zoom
+
+function boot(graph){
+  G = derive(graph);
+  NODE = Object.fromEntries(G.nodes.map(n=>[n.id,n]));
+  ADJ_CO = pairMap(G.cocitation);
+  ADJ_CP = pairMap(G.coupling);
+  DIRECT = new Set(G.edges.map(([a,b])=>a+"|"+b).concat(G.edges.map(([a,b])=>b+"|"+a)));
+  document.getElementById('corpusCount').textContent =
+    G.nodes.length.toLocaleString()+" papers · "+G.edges.length.toLocaleString()+" edges";
+  render();
+}
+function pairMap(list){ const m={}; list.forEach(([a,b,w])=>{
+  (m[a]=m[a]||{})[b]=w; (m[b]=m[b]||{})[a]=w; }); return m; }
+
+/* scoring: candidate c against current seed set ---------------------------- */
+function score(cId, mode){
+  let co=0,cp=0,dr=0;
+  seeds.forEach(s=>{
+    co += (ADJ_CO[s] && ADJ_CO[s][cId]) || 0;
+    cp += (ADJ_CP[s] && ADJ_CP[s][cId]) || 0;
+    if(DIRECT.has(s+"|"+cId)) dr += 1;
+  });
+  if(mode==="cocite") return co;
+  if(mode==="couple") return cp;
+  if(mode==="direct") return dr;
+  return 2*dr + 1.5*co + cp;      // blend
+}
+
+function expand(){
+  if(!seeds.size) return;
+  const mode = document.getElementById('rank').value;
+  const topN = +document.getElementById('topN').value;
+  const cand = {};
+  G.nodes.forEach(n=>{ if(seeds.has(n.id)) return;
+    const sc = score(n.id, mode); if(sc>0) cand[n.id]=sc; });
+  const chosen = Object.entries(cand).sort((a,b)=>b[1]-a[1])
+                 .slice(0, topN).map(([id])=>id);
+  layout([...seeds], chosen, cand);
+}
+
+/* place nodes on year(x) × metric(y) axes ---------------------------------- */
+function layout(seedIds, suggIds, candScores){
+  const all = seedIds.concat(suggIds);
+  const yMode = document.getElementById('yaxis').value;
+  const yearOf = id => NODE[id].year;
+  const yVal = id => yMode==="relevance"
+      ? (candScores[id]||Math.max(1,...Object.values(candScores||{1:1})))
+      : NODE[id].cited_by;
+  const years = all.map(yearOf), yvals = all.map(yVal);
+  const yr0=Math.min(...years), yr1=Math.max(...years);
+  const yv0=Math.min(...yvals), yv1=Math.max(...yvals);
+  placed = all.map(id=>{
+    const px = yr1===yr0 ? .5 : (yearOf(id)-yr0)/(yr1-yr0);
+    const py = yv1===yv0 ? .5 : (yVal(id)-yv0)/(yv1-yv0);
+    return { id, node:NODE[id], nx:px, ny:py, kind: seeds.has(id)?"seed":"sugg" };
+  });
+  render();
+}
+
+/* ---------------------------------------------------------------------------
+   RENDER (SVG, hand-rolled — no libs)
+--------------------------------------------------------------------------- */
+const SVG="http://www.w3.org/2000/svg";
+const svg=document.getElementById('canvas');
+function el(t,a){ const e=document.createElementNS(SVG,t);
+  for(const k in a) e.setAttribute(k,a[k]); return e; }
+
+function render(){
+  const W=svg.clientWidth||900, H=svg.clientHeight||600;
+  const M={l:54,r:34,t:26,b:40};
+  svg.innerHTML="";
+  const root=el("g",{transform:`translate(${view.x} ${view.y}) scale(${view.k})`});
+  svg.appendChild(root);
+
+  const px = nx => M.l + nx*(W-M.l-M.r);
+  const py = ny => (H-M.b) - ny*(H-M.t-M.b);
+
+  // axis frame
+  const gx=el("g",{}); root.appendChild(gx);
+  [0,.25,.5,.75,1].forEach(f=>{
+    gx.appendChild(el("line",{class:"gridline",x1:px(f),y1:M.t,x2:px(f),y2:H-M.b}));
+    gx.appendChild(el("line",{class:"gridline",x1:M.l,y1:py(f),x2:W-M.r,y2:py(f)}));
+  });
+  const ax=el("text",{class:"axis-lbl",x:W-M.r,y:H-14,"text-anchor":"end"});
+  ax.textContent="publication year →"; root.appendChild(ax);
+  const ay=el("text",{class:"axis-lbl",x:16,y:M.t+4,transform:`rotate(-90 16 ${M.t+4})`});
+  ay.textContent = (document.getElementById('yaxis').value==="relevance"
+                    ? "relevance ↑" : "citations ↑"); root.appendChild(ay);
+
+  if(!placed.length){
+    const t=el("text",{x:W/2,y:H/2,"text-anchor":"middle",class:"tick"});
+    t.textContent = seeds.size ? "Press “Explore connections”." :
+      "Search a paper, add it as a seed, then explore.";
+    t.setAttribute("font-size","13"); root.appendChild(t); wirePan(); return;
+  }
+
+  // year ticks
+  const yrs=[...new Set(placed.map(p=>p.node.year))].sort();
+  const yr0=yrs[0], yr1=yrs[yrs.length-1];
+  [yr0, Math.round((yr0+yr1)/2), yr1].forEach(y=>{
+    const f = yr1===yr0?.5:(y-yr0)/(yr1-yr0);
+    const t=el("text",{class:"tick",x:px(f),y:H-M.b+16,"text-anchor":"middle"});
+    t.textContent=y; root.appendChild(t);
+  });
+
+  const pos=Object.fromEntries(placed.map(p=>[p.id,{x:px(p.nx),y:py(p.ny)}]));
+
+  // edges among placed nodes
+  const eg=el("g",{}); root.appendChild(eg);
+  const set=new Set(placed.map(p=>p.id));
+  G.edges.forEach(([a,b])=>{ if(set.has(a)&&set.has(b)){
+    const hot = seeds.has(a)||seeds.has(b);
+    eg.appendChild(el("line",{x1:pos[a].x,y1:pos[a].y,x2:pos[b].x,y2:pos[b].y,
+      stroke:hot?"var(--edge-hot)":"var(--edge)","stroke-width":hot?1.4:.9,
+      opacity:hot?.55:.4})); }});
+
+  // nodes
+  placed.forEach(p=>{
+    const g=el("g",{class:"node",transform:`translate(${pos[p.id].x} ${pos[p.id].y})`});
+    const r = p.kind==="seed" ? 8 : 5.5 + Math.min(4, p.node.cited_by/14);
+    const c=el("circle",{r,
+      fill: p.kind==="seed"?"var(--seed)":"var(--node-soft)",
+      stroke: p.kind==="seed"?"#7d2f12":"var(--node)","stroke-width":1.5});
+    g.appendChild(c);
+    if(p.kind==="seed" || p.node.cited_by>=38){
+      const lab=el("text",{x:r+4,y:3.5});
+      lab.textContent = short(p.node); g.appendChild(lab);
+    }
+    g.addEventListener("click",ev=>{ev.stopPropagation(); showDetail(p.node);});
+    root.appendChild(g);
+  });
+  wirePan();
+}
+function short(n){ const a=n.authors[0].replace(/,.*/,"");
+  return a+" "+n.year; }
+
+/* detail popover ----------------------------------------------------------- */
+function showDetail(n){
+  const d=document.getElementById('detail');
+  const inSeed=seeds.has(n.id);
+  const url = n.url || ("https://aclanthology.org/"+n.id+"/");
+  d.innerHTML =
+    `<span class="close" id="dc">×</span>`+
+    `<h3>${n.title}</h3>`+
+    `<div class="meta">${n.venue} · ${n.year} · ${n.id}</div>`+
+    `<div class="auth">${n.authors.join(", ")}</div>`+
+    `<div class="meta">cited by ${n.cited_by} papers in corpus</div>`+
+    `<a href="${url}" target="_blank" rel="noopener">${url.replace('https://','')}</a>`+
+    (inSeed? `<button class="addbtn" id="da" style="background:#8b867a">Remove from seeds</button>`
+           : `<button class="addbtn" id="da">Add as seed</button>`);
+  d.classList.add("show");
+  document.getElementById('dc').onclick=()=>d.classList.remove("show");
+  document.getElementById('da').onclick=()=>{
+    if(inSeed) seeds.delete(n.id); else seeds.add(n.id);
+    d.classList.remove("show"); refreshSeeds(); expand();
+  };
+}
+
+/* pan + zoom --------------------------------------------------------------- */
+function wirePan(){
+  let down=false, sx, sy;
+  svg.onmousedown=e=>{ if(e.target.closest(".node"))return;
+    down=true; sx=e.clientX-view.x; sy=e.clientY-view.y; svg.classList.add("drag"); };
+  window.onmousemove=e=>{ if(!down)return; view.x=e.clientX-sx; view.y=e.clientY-sy; applyView(); };
+  window.onmouseup=()=>{ down=false; svg.classList.remove("drag"); };
+  svg.onwheel=e=>{ e.preventDefault(); const f=e.deltaY<0?1.1:.9;
+    const nx=e.offsetX-(e.offsetX-view.x)*f, ny=e.offsetY-(e.offsetY-view.y)*f;
+    view.k=Math.max(.4,Math.min(3,view.k*f)); view.x=nx; view.y=ny; applyView(); };
+}
+function applyView(){ const g=svg.querySelector("g");
+  if(g) g.setAttribute("transform",`translate(${view.x} ${view.y}) scale(${view.k})`); }
+
+/* ---------------------------------------------------------------------------
+   SIDEBAR WIRING
+--------------------------------------------------------------------------- */
+const searchEl=document.getElementById('search'), resEl=document.getElementById('results');
+searchEl.addEventListener('input',()=>{
+  const q=searchEl.value.trim().toLowerCase();
+  if(!q){ resEl.innerHTML=""; return; }
+  const hits=G.nodes.filter(n=>
+    n.title.toLowerCase().includes(q) ||
+    n.id.toLowerCase().includes(q) ||
+    n.authors.join(" ").toLowerCase().includes(q)
+  ).slice(0,8);
+  resEl.innerHTML = hits.map(n=>
+    `<li data-id="${n.id}"><span class="yr">${n.year}</span> ${n.title} <em>— ${n.authors[0]}</em></li>`
+  ).join("");
+  [...resEl.children].forEach(li=>li.onclick=()=>{
+    seeds.add(li.dataset.id); searchEl.value=""; resEl.innerHTML="";
+    refreshSeeds(); expand();
+  });
+});
+
+function refreshSeeds(){
+  const ul=document.getElementById('seeds'), emp=document.getElementById('seedEmpty');
+  document.getElementById('seedN').textContent = seeds.size?("· "+seeds.size):"";
+  if(!seeds.size){ ul.innerHTML=""; emp.style.display="block"; return; }
+  emp.style.display="none";
+  ul.innerHTML=[...seeds].map(id=>{ const n=NODE[id];
+    return `<li><span class="dot"></span><div>${n.title}<br>
+      <span class="yr" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-3)">${n.venue} ${n.year}</span></div>
+      <span class="x" data-id="${id}">✕</span></li>`; }).join("");
+  [...ul.querySelectorAll(".x")].forEach(x=>x.onclick=()=>{
+    seeds.delete(x.dataset.id); refreshSeeds();
+    seeds.size? expand() : (placed=[], render()); });
+}
+
+document.getElementById('topN').oninput=e=>{
+  document.getElementById('topNv').textContent=e.target.value;
+  if(seeds.size) expand(); };
+document.getElementById('rank').onchange=()=>seeds.size&&expand();
+document.getElementById('yaxis').onchange=()=>seeds.size&&expand();
+document.getElementById('expand').onclick=expand;
+document.getElementById('reset').onclick=()=>{
+  seeds.clear(); placed=[]; view={x:0,y:0,k:1};
+  refreshSeeds(); document.getElementById('detail').classList.remove("show"); render();
+};
+window.addEventListener('resize',()=>render());
+
+/* ---- start: try real graph.json, else fall back to baked sample ---------- */
+fetch('graph.json').then(r=>{ if(!r.ok) throw 0; return r.json(); })
+  .then(boot).catch(()=>boot(SAMPLE));
+</script>
+</body>
+</html>
