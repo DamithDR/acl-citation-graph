@@ -19,9 +19,14 @@ Keep `s2_client.py` in the same folder as the builders — they import it.
 ## Requirements
 
 ```
-pip install acl-anthology-py requests ijson tqdm
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 export SEMANTIC_SCHOLAR_API_KEY=your_key      # free: semanticscholar.org/product/api
 ```
+
+Python 3.11+ is required. The app itself is static (no Python) — these deps are
+only for building the graph.
 
 `s2_client.py` enforces the introductory 1 request/second limit across all
 endpoints and handles HTTP 429 with Retry-After / backoff, so you never trip

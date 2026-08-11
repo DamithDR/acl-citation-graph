@@ -55,7 +55,7 @@ echo
 source venv/bin/activate
 
 # First run installs deps; comment out once your venv is provisioned.
-python3 -m pip install --quiet acl-anthology-py requests ijson tqdm
+python3 -m pip install --quiet -r requirements.txt
 
 # --- run -------------------------------------------------------------------
 # --download fetches the S2 snapshots on the first run. On a re-run where
