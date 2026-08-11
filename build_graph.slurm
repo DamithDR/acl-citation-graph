@@ -7,7 +7,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=40G
+#SBATCH --mem=24G
 
 # ---------------------------------------------------------------------------
 # Full ACL-Anthology citation-graph build on Slurm.
@@ -54,8 +54,6 @@ echo
 # --- environment -----------------------------------------------------------
 source venv/bin/activate
 
-# First run installs deps; comment out once your venv is provisioned.
-python3 -m pip install --quiet -r requirements.txt
 
 # --- run -------------------------------------------------------------------
 # --download fetches the S2 snapshots on the first run. On a re-run where
